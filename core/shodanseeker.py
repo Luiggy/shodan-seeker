@@ -1,28 +1,24 @@
-import sys
-import logging
-import os
-import re
-import optparse
-
-import shodan
-import datetime
-import click
-import time
-import requests
-import smtplib
-from datetime import datetime, date, timedelta
 import argparse
-from shodan import Shodan
-from shodan.exception import APIError
-from shodan.cli.alert import alert_clear
-from shodan.helpers import get_ip
-from ipcalc import IP, Network
+import datetime
+import logging
+import optparse
+import os
+import smtplib
+import sys
+import time
+from datetime import datetime, timedelta
+from email.mime.application import MIMEApplication
 # migrated to py3
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
-from email import encoders
+
+import click
 import coloredlogs
+import requests
+from ipcalc import Network
+from shodan import Shodan
+from shodan.exception import APIError
+from shodan.helpers import get_ip
 
 parser = argparse.ArgumentParser()
 parser.parse_args()
