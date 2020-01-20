@@ -1,5 +1,10 @@
-requests
+emoji
+telegram
 shodan
+coloredlogs
+python-telegram-bot
+requests
 click
 ipcalc
 six
+argparse

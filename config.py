@@ -1,20 +1,20 @@
-
-api = [{ 
-            'key' : "<API_KEY>"  # Enter yor API Key from Shodan
+api = [{
+    'key': ''  # Enter yor API Key from Shodan
 }]
-
-
 paths = {
-            'mainpath' : "<PATH>/shodan-seeker/",
-            'logpath' : "<PATH>/shodan-seeker/logs/",
-            'scanidpath' : "<PATH>/shodan-seeker/scanID/",
-            'reportpath' : "<PATH>/shodan-seeker/reports/"
+    "mainpath": "{PATH}/shodan-seeker/",
+    "logpath": "{PATH}/shodan-seeker/logs/",
+    "scanidpath": "{PATH}/shodan-seeker/scanID/",
+    "reportpath": "{PATH}/shodan-seeker/reports/"
 }
-
 mail = {
-            'fromaddress' : "<FROM_MAIL_ADDRESS@gmail.com>",
-            'frompassword' : "<MAIL_PASSWORD>",
-            'toaddress1' : "<TOADDRESS1@gmail.com>",
-            'toaddress2' : "<TOADDRESS2@gmail.com>",
-            'smtp' : "smtp.gmail.com"
-}
+           "fromaddress": "{mail}",
+           "frompassword": "{password}",
+           "toaddress1": "{to1}",
+           "toaddress2": "{to2}",
+           "smtp": "{server}"
+       }
+# api = {
+#     "shodan": "<API_KEY>",
+#     "otracosa": "API_KEY2"
+# }

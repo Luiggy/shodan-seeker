@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from core.shodanseeker import ShodanSeeker
-
+import config
 class NullOutput(object):
     def write(self, text):
         pass
