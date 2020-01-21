@@ -11,7 +11,6 @@ from email.mime.application import MIMEApplication
 # migrated to py3
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
 import click
 import coloredlogs
 import requests
