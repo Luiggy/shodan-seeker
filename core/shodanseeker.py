@@ -1,13 +1,16 @@
+import textwrap
+
 import argparse
 import datetime
 import logging
-import optparse
+from optparse import OptionParser
 import os
 import smtplib
 import sys
 import time
 from datetime import datetime, timedelta
 from email.mime.application import MIMEApplication
+
 # migrated to py3
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -703,82 +706,74 @@ class ShodanSeeker:
 
     @property
     def run(self):
-        usage = "usage: python %prog [options]"
+        parser = argparse.ArgumentParser(prog='shodanseeker.py', usage="usage: pythOn %(prog)s [options]",
+                                         description="Command line tool for diffing scanning results, monitor, and set alets on a given asset or range.",
+                                         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=textwrap.dedent('''\
 
-        epi = """
-EXAMPLES:
-  ./shodanseeker --si 'X.X.X.X X.X.X.X/24'                                   # Scan IPs/netblocks
-  ./shodanseeker --sf 'pathfilename'                                         # Scan IPs/netblocks from a file
-  ./shodanseeker -l                                                          # List previously submitted scans
-  ./shodanseeker -i 'X.X.X.X X.X.X.X/24 Y.Y.Y.Y'                             # Get all information of IP/netblocks
-  ./shodanseeker -f 'pathfilename'                                           # Get all information from a file of IPs/netblocks
-  ./shodanseeker -i 'X.X.X.X' --history                                      # Get all historical banners
-  ./shodanseeker -i 'X.X.X.X' --diff                                         # Detect new services published 
-  ./shodanseeker -f 'pathfilename' [--history|--diff] --output csv           # Output results in csv format
-  ./shodanseeker -i 'X.X.X.X' --diff --output csv --mail toaddr -a           # Send email with csv results attached
-  ./shodanseeker --ca Name 'X.X.X.X X.X.X.X/24'                              # Create network alerts for the IP/netblock 
-  ./shodanseeker --cf Name 'pathfilename'                                    # Create network alerts from file
-  ./shodanseeker --la                                                        # List of all the network alerts activated on the account
-  ./shodanseeker --da [alertid|all]                                          # Remove the specified network alert
-  ./shodanseeker --subs [alertid|all] --monport '3389 22' [--mail toaddr]    # Subscribe to the Streaming and monitoring for high risk services
-  ./shodanseeker --subs [alertid|all] --mondiff [--mail toaddr]              # Subscribe to the Streaming and monitoring for new services published
-  ./shodanseeker --subs [alertid|all] --montag 'compromised' [--mail toaddr] # Subscribe to the Streaming and monitoring for tags (ex: compromised, doublepulsar, self-signed)
-  ./shodanseeker --get [protocols|services|ports|tags]                       # List of (protocols,services,ports,tags) supported
-"""
+        EXAMPLES:
+          ./shodanseeker --si 'X.X.X.X X.X.X.X/24'                                   # Scan IPs/netblocks
+          ./shodanseeker --sf 'pathfilename'                                         # Scan IPs/netblocks from a file
+          ./shodanseeker -l                                                          # List previously submitted scans
+          ./shodanseeker -i 'X.X.X.X X.X.X.X/24 Y.Y.Y.Y'                             # Get all information of IP/netblocks
+          ./shodanseeker -f 'pathfilename'                                           # Get all information from a file of IPs/netblocks
+          ./shodanseeker -i 'X.X.X.X' --history                                      # Get all historical banners
+          ./shodanseeker -i 'X.X.X.X' --diff                                         # Detect new services published 
+          ./shodanseeker -f 'pathfilename' [--history|--diff] --output csv           # Output results in csv format
+          ./shodanseeker -i 'X.X.X.X' --diff --output csv --mail toaddr -a           # Send email with csv results attached
+          ./shodanseeker --ca Name 'X.X.X.X X.X.X.X/24'                              # Create network alerts for the IP/netblock 
+          ./shodanseeker --cf Name 'pathfilename'                                    # Create network alerts from file
+          ./shodanseeker --la                                                        # List of all the network alerts activated on the account
+          ./shodanseeker --da [alertid|all]                                          # Remove the specified network alert
+          ./shodanseeker --subs [alertid|all] --monport '3389 22' [--mail toaddr]    # Subscribe to the Streaming and monitoring for high risk services
+          ./shodanseeker --subs [alertid|all] --mondiff [--mail toaddr]              # Subscribe to the Streaming and monitoring for new services published
+          ./shodanseeker --subs [alertid|all] --montag 'compromised' [--mail toaddr] # Subscribe to the Streaming and monitoring for tags (ex: compromised, doublepulsar, self-signed)
+          ./shodanseeker --get [protocols|services|ports|tags]                       # List of (protocols,services,ports,tags) supported
+'''))
+        # parser = MyParser(epilog=epi)
 
-        class myParser(optparse.OptionParser):
-            def format_epilog(self, formatter):
-                return self.epilog
+        # subparse = argparse.ArgumentParser.add_subparsers()
 
-        # parser = myParser(epilog=epi)
-        # parser = argparse.OptionParser()
-        parser = optparse.OptionParser()
-        parser.set_usage(usage)
+        parser.add_argument("--mail", dest="mail", help="Send email with results and alerts", default=None)
+        parser.add_argument("-a", dest="attach", action="store_true", help="Attach csv results to an email",
+                            default=None)
 
-        parser.add_option("--mail", dest="mail", help="Send email with results and alerts", default=None)
-        parser.add_option("-a", dest="attach", action="store_true", help="Attach csv results to an email",
-                          default=None)
+        group1 = parser.add_argument_group('Scanning options')
+        group1.add_argument('--si', dest='scaninput', help='Scan an IP/netblock', default=None)
+        group1.add_argument('--sf', dest='scanfile', help='Scan an IP/netblock from file', default=None)
+        group1.add_argument("--force", dest="scanforce", help="Force Shodan to re-scan the provided IPs",
+                            action="store_true", default=None)
+        group1.add_argument("-l", dest="scanlist", action="store_true", help="List previously submitted scans",
+                            default=None)
+        parser.add_argument_group(group1)
 
-        group1 = optparse.OptionGroup(parser, 'Scanning options')
-        group1.add_option('--si', dest='scaninput', help='Scan an IP/netblock', default=None)
-        group1.add_option('--sf', dest='scanfile', help='Scan an IP/netblock from file', default=None)
-        group1.add_option("--force", dest="scanforce", help="Force Shodan to re-scan the provided IPs",
-                          action="store_true", default=None)
-        group1.add_option("-l", dest="scanlist", action="store_true", help="List previously submitted scans",
-                          default=None)
-        parser.add_option_group(group1)
+        group2 = parser.add_argument_group('Searching Options')
+        group2.add_argument("-i", dest="getinfo", help="Get all information of an IP/netblock", default=None)
+        group2.add_argument("-f", dest="getinfofromfile", help="Get all information of an IP/netblock from file",
+                            default=None)
+        group2.add_argument("--history", dest="history", help="Return all Historical Banners", action="store_true",
+                            default=None)
+        group2.add_argument("--diff", dest="diff", help="Detect New Services Published", action="store_true",
+                            default=None)
+        group2.add_argument("--output", dest="output", help="Output results in csv format", default=None)
+        parser.add_argument_group(group2)
 
-        group2 = parser.add_option_group('Searching Options')
-        group2.add_option("-i", dest="getinfo", help="Get all information of an IP/netblock", default=None)
-        group2.add_option("-f", dest="getinfofromfile", help="Get all information of an IP/netblock from file",
-                          default=None)
-        group2.add_option("--history", dest="history", help="Return all Historical Banners", action="store_true",
-                          default=None)
-        group2.add_option("--diff", dest="diff", help="Detect New Services Published", action="store_true",
-                          default=None)
-        group2.add_option("--output", dest="output", help="Output results in csv format", default=None)
-        parser.add_option_group(group2)
+        group3 = parser.add_argument_group('Monitoring in Real-Time')
+        group3.add_argument("--ca", dest="addalert", help="Create network alerts for the IP/netblock", nargs=2,
+                            default=None)
+        group3.add_argument("--cf", dest="addalertfile", help="Create network alerts from file", nargs=2, default=None)
+        group3.add_argument("--la", dest="listalerts", help="List of all the network alerts activated",
+                            action="store_true", default=None)
+        group3.add_argument("--da", dest="delalert", help="Remove the specified network alert", default=None)
+        group3.add_argument("--subs", dest="subsalerts", help="Subscribe to the Private Horse Streaming", default=None)
+        group3.add_argument("--monport", dest="monport", help="Monitoring for High Risk Services", default=None)
+        group3.add_argument("--mondiff", dest="mondiff", action="store_true",
+                            help="Monitoring for New Services Published", default=None)
+        group3.add_argument("--montag", dest="montag", help="Tags (ex: compromised, doublepulsar, self-signed)",
+                            default=None)
+        group3.add_argument("--get", dest="get", help="Protocols, services, ports and tags supported", default=None)
+        parser.add_argument_group(group3)
 
-        group3 = parser.add_option_group('Monitoring in Real-Time')
-        group3.add_option("--ca", dest="addalert", help="Create network alerts for the IP/netblock", nargs=2,
-                          default=None)
-        group3.add_option("--cf", dest="addalertfile", help="Create network alerts from file", nargs=2,
-                          default=None)
-        group3.add_option("--la", dest="listalerts", help="List of all the network alerts activated",
-                          action="store_true", default=None)
-        group3.add_option("--da", dest="delalert", help="Remove the specified network alert", default=None)
-        group3.add_option("--subs", dest="subsalerts", help="Subscribe to the Private Horse Streaming",
-                          default=None)
-        group3.add_option("--monport", dest="monport", help="Monitoring for High Risk Services", default=None)
-        group3.add_option("--mondiff", dest="mondiff", action="store_true",
-                          help="Monitoring for New Services Published", default=None)
-        group3.add_option("--montag", dest="montag", help="Tags (ex: compromised, doublepulsar, self-signed)",
-                          default=None)
-        group3.add_option("--get", dest="get", help="Protocols, services, ports and tags supported", default=None)
-        parser.add_option_group(group3)
-
-        global options, args
-        (options, args) = parser.parse_args()
+        args = parser.parse_args()
 
         for key in self.config.api:
             self.api_key = key['key']
@@ -792,26 +787,26 @@ EXAMPLES:
             self.logpath = self.config.paths['logpath']
 
         if self.api_key == '':
-            print('[Error] Set the API Key into the configuration file')
+            print('[Error] Set the Shodan API Key into the configuration file')
             sys.exit(1)
 
-        if options.scaninput is not None:
+        if args.scaninput:
             if options.scaninput:
                 if options.scanforce:
                     self.force = True
                 shodanscan = ShodanSeeker(self.api_key)
-                shodanscan.scan_range(options.scaninput, self.force)
+                shodanscan.scan_range(args.scaninput, self.force)
             else:
                 print('[Error] Input must not be null')
                 sys.exit(1)
 
-        elif options.scanfile is not None:
-            if options.scanfile:
-                if os.path.isfile(options.scanfile):
-                    if options.scanforce:
+        elif args.scanfile is not None:
+            if args.scanfile:
+                if os.path.isfile(args.scanfile):
+                    if args.scanforce:
                         self.force = True
                     shodanscan = ShodanSeeker(self.api_key)
-                    shodanscan.scan_file(options.scanfile, self.force)
+                    shodanscan.scan_file(args.scanfile, self.force)
                 else:
                     print('[Error] File does not exist')
                     sys.exit(1)
@@ -819,140 +814,140 @@ EXAMPLES:
                 print('[Error] Input must not be null')
                 sys.exit(1)
 
-        elif options.scanlist is not None:
+        elif args.scanlist is not None:
             self.print_scanlistID()
 
-        elif options.getinfo is not None:
-            if options.getinfo:
+        elif args.getinfo is not None:
+            if args.getinfo:
                 shodangetinfo = ShodanSeeker(self.api_key)
-                if options.history and options.diff:
+                if args.history and args.diff:
                     parser.error("Options --history and --diff are mutually exclusive")
-                if options.history:
-                    if options.output:
-                        if options.output == 'csv':
-                            if options.mail:
-                                if options.mail in self.config.mail:
-                                    if options.attach:
-                                        shodangetinfo.get_info(options.getinfo, options.history, None, options.output,
-                                                               options.mail, options.attach)
+                if args.history:
+                    if args.output:
+                        if args.output == 'csv':
+                            if args.mail:
+                                if args.mail in self.config.mail:
+                                    if args.attach:
+                                        shodangetinfo.get_info(args.getinfo, args.history, None, args.output,
+                                                               args.mail, args.attach)
                                     else:
-                                        shodangetinfo.get_info(options.getinfo, options.history, None, options.output,
-                                                               options.mail, None)
+                                        shodangetinfo.get_info(args.getinfo, args.history, None, args.output,
+                                                               args.mail, None)
                                 else:
                                     print('[Error] Select a valid toaddress list from config file')
                             else:
-                                shodangetinfo.get_info(options.getinfo, options.history, None, options.output, None,
+                                shodangetinfo.get_info(args.getinfo, args.history, None, args.output, None,
                                                        None)
                         else:
                             print('[Error] Output format not supported')
                     else:
-                        if options.mail:
-                            if options.attach:
+                        if args.mail:
+                            if args.attach:
                                 print('[Error] Select a file format output')
                             else:
-                                shodangetinfo.get_info(options.getinfo, options.history, None, None, options.mail, None)
+                                shodangetinfo.get_info(args.getinfo, args.history, None, None, args.mail, None)
                         else:
-                            shodangetinfo.get_info(options.getinfo, options.history, None, None, None, None)
+                            shodangetinfo.get_info(args.getinfo, args.history, None, None, None, None)
                 else:
-                    if options.diff:
-                        if options.output:
-                            if options.output == 'csv':
-                                if options.mail:
-                                    if options.mail in self.config.mail:
-                                        if options.attach:
-                                            shodangetinfo.get_info(options.getinfo, True, options.diff, options.output,
-                                                                   options.mail, options.attach)
+                    if args.diff:
+                        if args.output:
+                            if args.output == 'csv':
+                                if args.mail:
+                                    if args.mail in self.config.mail:
+                                        if args.attach:
+                                            shodangetinfo.get_info(args.getinfo, True, args.diff, args.output,
+                                                                   args.mail, args.attach)
                                         else:
-                                            shodangetinfo.get_info(options.getinfo, True, options.diff, options.output,
-                                                                   options.mail, None)
+                                            shodangetinfo.get_info(args.getinfo, True, args.diff, args.output,
+                                                                   args.mail, None)
                                     else:
                                         print('[Error] Select a valid toaddress list from config file')
                                 else:
-                                    shodangetinfo.get_info(options.getinfo, True, options.diff, options.output, None,
+                                    shodangetinfo.get_info(args.getinfo, True, args.diff, args.output, None,
                                                            None)
                             else:
                                 print('[Error] Output format not supported')
                         else:
-                            if options.mail:
-                                if options.mail in self.config.mail:
-                                    if options.attach:
+                            if args.mail:
+                                if args.mail in self.config.mail:
+                                    if args.attach:
                                         print('[Error] Select a file format output')
                                     else:
-                                        shodangetinfo.get_info(options.getinfo, True, options.diff, None, options.mail,
+                                        shodangetinfo.get_info(args.getinfo, True, args.diff, None, args.mail,
                                                                None)
                                 else:
                                     print('[Error] Select a valid toaddress list from config file')
                             else:
-                                shodangetinfo.get_info(options.getinfo, True, options.diff, None, None, None)
+                                shodangetinfo.get_info(args.getinfo, True, args.diff, None, None, None)
                     else:
-                        if options.output:
-                            if options.output == 'csv':
-                                if options.mail:
-                                    if options.mail in self.config.mail:
-                                        if options.attach:
-                                            shodangetinfo.get_info(options.getinfo, None, None, options.output,
-                                                                   options.mail, options.attach)
+                        if args.output:
+                            if args.output == 'csv':
+                                if args.mail:
+                                    if args.mail in self.config.mail:
+                                        if args.attach:
+                                            shodangetinfo.get_info(args.getinfo, None, None, args.output,
+                                                                   args.mail, args.attach)
                                         else:
-                                            shodangetinfo.get_info(options.getinfo, None, None, options.output,
-                                                                   options.mail, None)
+                                            shodangetinfo.get_info(args.getinfo, None, None, args.output,
+                                                                   args.mail, None)
                                     else:
                                         print('[Error] Select a valid toaddress list from config file')
                                 else:
-                                    shodangetinfo.get_info(options.getinfo, None, None, options.output, None, None)
+                                    shodangetinfo.get_info(args.getinfo, None, None, args.output, None, None)
                             else:
                                 print('[Error] Output format not supported')
                         else:
-                            if options.mail:
-                                if options.attach:
+                            if args.mail:
+                                if args.attach:
                                     print('[Error] Select a file format output')
                                 else:
-                                    shodangetinfo.get_info(options.getinfo, None, None, None, options.mail, None)
+                                    shodangetinfo.get_info(args.getinfo, None, None, None, args.mail, None)
                             else:
-                                shodangetinfo.get_info(options.getinfo, None, None, None, None, None)
+                                shodangetinfo.get_info(args.getinfo, None, None, None, None, None)
             else:
                 print('[Error] Input must not be null')
                 sys.exit(1)
 
-        elif options.getinfofromfile is not None:
-            if options.getinfofromfile:
-                if os.path.isfile(options.getinfofromfile):
+        elif args.getinfofromfile is not None:
+            if args.getinfofromfile:
+                if os.path.isfile(args.getinfofromfile):
                     shodangetinfofromfile = ShodanSeeker(self.api_key)
-                    if options.history and options.diff:
+                    if args.history and args.diff:
                         parser.error("Options --history and --diff are mutually exclusive")
-                    if options.history:
-                        if options.output:
-                            if options.output == 'csv':
-                                if options.mail:
-                                    if options.mail in self.config.mail:
-                                        if options.attach:
-                                            shodangetinfofromfile.get_infofromfile(options.getinfofromfile,
-                                                                                   options.history, None,
-                                                                                   options.output, options.mail,
-                                                                                   options.attach)
+                    if args.history:
+                        if args.output:
+                            if args.output == 'csv':
+                                if args.mail:
+                                    if args.mail in self.config.mail:
+                                        if args.attach:
+                                            shodangetinfofromfile.get_infofromfile(args.getinfofromfile,
+                                                                                   args.history, None,
+                                                                                   args.output, args.mail,
+                                                                                   args.attach)
                                         else:
-                                            shodangetinfofromfile.get_infofromfile(options.getinfofromfile,
-                                                                                   options.history, None,
-                                                                                   options.output, options.mail, None)
+                                            shodangetinfofromfile.get_infofromfile(args.getinfofromfile,
+                                                                                   args.history, None,
+                                                                                   args.output, args.mail, None)
                                     else:
                                         print('[Error] Select a valid toaddress list from config file')
                                 else:
-                                    shodangetinfofromfile.get_infofromfile(options.getinfofromfile, options.history,
-                                                                           None, options.output, None, None)
+                                    shodangetinfofromfile.get_infofromfile(args.getinfofromfile, args.history,
+                                                                           None, args.output, None, None)
                             else:
                                 print('[Error] Output format not supported')
                         else:
-                            if options.mail:
-                                if options.attach:
+                            if args.mail:
+                                if args.attach:
                                     print('[Error] Select a file format output')
                                 else:
-                                    shodangetinfofromfile.get_infofromfile(options.getinfofromfile, options.history,
-                                                                           None, None, options.mail, None)
+                                    shodangetinfofromfile.get_infofromfile(args.getinfofromfile, args.history,
+                                                                           None, None, args.mail, None)
                             else:
-                                shodangetinfofromfile.get_infofromfile(options.getinfofromfile, options.history, None,
+                                shodangetinfofromfile.get_infofromfile(args.getinfofromfile, args.history, None,
                                                                        None, None, None)
                     else:
-                        if options.diff:
-                            if options.output:
+                        if args.diff:
+                            if args.output:
                                 if options.output == 'csv':
                                     if options.mail:
                                         if options.mail in self.config.mail:
@@ -1026,18 +1021,17 @@ EXAMPLES:
                 print('[Error] Input must not be null')
                 sys.exit(1)
 
-        elif options.addalert is not None:
+        elif args.addalert:
             if options.addalert:
                 name = options.addalert[0]
                 ips = options.addalert[1]
                 shodanaddalert = ShodanSeeker(self.api_key)
                 shodanaddalert.create_alert(name, ips)
             else:
-                print
-                '[Error] Input must not be null'
+                print('[Error] Input must not be null')
                 sys.exit(1)
 
-        elif options.addalertfile is not None:
+        elif args.addalertfile:
             if options.addalertfile:
                 name = options.addalertfile[0]
                 file = options.addalertfile[1]
@@ -1051,20 +1045,19 @@ EXAMPLES:
                 print('[Error] Input must not be null')
                 sys.exit(1)
 
-        elif options.listalerts:
+        elif args.listalerts:
             shodanlistalerts = ShodanSeeker(self.api_key)
             shodanlistalerts.list_alerts()
 
-        elif options.delalert is not None:
+        elif args.delalert:
             if options.delalert:
                 shodanadddelalert = ShodanSeeker(self.api_key)
                 shodanadddelalert.delete_alert(options.delalert)
             else:
-                print
-                '[Error] Input must not be null'
+                print('[Error] Input must not be null')
                 sys.exit(1)
 
-        elif options.subsalerts is not None:
+        elif args.subsalerts:
             if options.subsalerts:
                 if options.monport:
                     shodansubs = ShodanSeeker(self.api_key)
@@ -1100,7 +1093,7 @@ EXAMPLES:
                 print('[Error] Input must not be null')
                 sys.exit(1)
 
-        elif options.get is not None:
+        elif args.get:
             if options.get:
                 shodanget = ShodanSeeker(self.api_key)
                 shodanget.get_services(options.get)
