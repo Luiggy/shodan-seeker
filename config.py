@@ -2,10 +2,10 @@ api = [{
     'key': ''  # Enter yor API Key from Shodan
 }]
 paths = {
-    "mainpath": "{PATH}/shodan-seeker/",
-    "logpath": "{PATH}/shodan-seeker/logs/",
-    "scanidpath": "{PATH}/shodan-seeker/scanID/",
-    "reportpath": "{PATH}/shodan-seeker/reports/"
+    "mainpath": "./",
+    "logpath": "./logs/",
+    "scanidpath": "./scanID/",
+    "reportpath": "./reports/"
 }
 mail = {
            "fromaddress": "{mail}",

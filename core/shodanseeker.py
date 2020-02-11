@@ -22,6 +22,8 @@ from shodan.exception import APIError
 from shodan.helpers import get_ip
 
 # Create a logger object para poder logar los errores que nos aparezcan esto para el bot
+import config
+
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG')
 logging.basicConfig(filename='logs/seeker.log', filemode='w', level=logging.DEBUG,
@@ -32,11 +34,23 @@ filereportname = fecha.strftime("%Y-%m-%d-%H%M%S")
 
 class ShodanSeeker:
     def __init__(self, config, api_key=None, proxies=None):
-        self.api_key = api_key
+        self.api_key = config.api['key']
         self.proxies = proxies
         self.api = Shodan(self.api_key, self.proxies)
         self.force = False
         self.config = config
+        self.file = None
+        self.hostname = None
+        self.os = None
+        self.lastupdate = None
+        self.ports = []
+        self.product = None
+        self.version = None
+        self.transport = None
+        self.timestamp = None
+        self.res = ""
+        self.ports_uniq = None
+        self.scanidpath = None
 
     def log(self, action="", data=""):
         if action == "Error":
@@ -46,25 +60,25 @@ class ShodanSeeker:
         else:
             logging.info('[ Log ] ' + fecha.strftime("%c") + ' - ' + str(action) + str(data))
         filelogname = fecha.strftime("%m-%Y")
-        for logpath in self.config.paths:
+        for logpath in config.paths:
             # noinspection PyAttributeOutsideInit
-            self.logpath = self.config.paths['logpath']
+            self.logpath = config.paths['logpath']
         filelogpath = str(self.logpath) + filelogname + ".log"
         if os.path.isfile(filelogpath):
             fich = open(filelogpath, "a")
-            fich.write(msg + '\n')
+            fich.write(data + '\n')
             fich.close()
         else:
             fich = open(filelogpath, "w")
-            fich.write(msg + '\n')
+            fich.write(data + '\n')
             fich.close()
         if action != "newline":
-            logging.info(str(msg))  # Console output
+            logging.info(str(data))  # Console output
 
     def add_scanid(self, id):
-        for scanidpath in self.config.paths:
+        for scanidpath in config.paths:
             # noinspection PyAttributeOutsideInit
-            self.scanidpath = self.config.paths['scanidpath'] + "scanID.txt"
+            self.scanidpath = config.paths['scanidpath'] + "scanID.txt"
         if os.path.isfile(self.scanidpath):
             fich = open(self.scanidpath, "a")
             fich.write(id + '\t' + fecha.strftime("%c") + '\n')
@@ -76,8 +90,8 @@ class ShodanSeeker:
             fich.close()
 
     def print_scanlistID(self):
-        for scanidpath in self.config.paths:
-            self.scanidpath = self.config.paths['scanidpath'] + "scanID.txt"
+        for scanidpath in config.paths:
+            self.scanidpath = config.paths['scanidpath'] + "scanID.txt"
         if os.path.isfile(self.scanidpath):
             try:
                 with open(self.scanidpath, "r") as file_lines:
@@ -159,8 +173,8 @@ class ShodanSeeker:
         res1 = ""
         lista = input.split(" ")
         # self.log("List Split - ", list)
-        for reportpath in self.config.paths:
-            self.reportpath = self.config.paths['reportpath']
+        for reportpath in config.paths:
+            self.reportpath = config.paths['reportpath']
         if history is not None:
             if diff is not None:
                 filereportpath = str(self.reportpath) + str('diffing/') + filereportname + ".csv"
@@ -190,17 +204,17 @@ class ShodanSeeker:
                         self.log("newline")
                         time.sleep(0.5)
                         pass
-        if (output) is not None:
+        if output:
             self.log("Report: ", filereportpath)
             self.log("newline")
             res1 = "Results on " + filereportpath
-        if (toaddr) is not None:
+        if toaddr:
             body = res1 + "\n" + res
             subject = "[Searching results]"
-            if (diff):
+            if diff:
                 subject = subject + " New services published"
             else:
-                if (history):
+                if history:
                     subject = subject + " All historical banners"
                 else:
                     subject = subject + " All services"
@@ -211,7 +225,7 @@ class ShodanSeeker:
         # self.log("History banners - ", history)
         # self.log("Diff - ", diff)
         # self.log("Format - ", output)
-        if (toaddr) is not None:
+        if toaddr:
             try:
                 self.log("Mail - ", self.config.mail[toaddr])
             except KeyError as e:
@@ -229,10 +243,10 @@ class ShodanSeeker:
                 for line in file_lines:
                     lista.append(line.replace('\n', ''))
                 self.log("List of IPs/netblock - ", lista)
-                for reportpath in self.config.paths:
-                    self.reportpath = self.config.paths['reportpath']
-                if (history) is not None:
-                    if (diff) is not None:
+                for reportpath in config.paths:
+                    self.reportpath = config.paths['reportpath']
+                if history is not None:
+                    if diff is not None:
                         filereportpath = str(self.reportpath) + str('diffing/') + filereportname + ".csv"
                     else:
                         filereportpath = str(self.reportpath) + str('history/') + filereportname + ".csv"
@@ -290,8 +304,22 @@ class ShodanSeeker:
                 self.res = self.host_gethistdiff(host, history, output, filereportpath, diff, toaddr, None)
             else:
                 print('[Error] Output format not supported')
+                logger.error('[Error] Output format not supported')
                 sys.exit(1)
         return self.res
+
+    def host_printoutput(self, port, transport, product, version, date, toaddr, subs):
+        res = 'Port: ' + str(port) + ' ' + str(transport)
+        if product or version:
+            res = res + ' ' + str(product) + ' ' + str(version)
+        if date:
+            resaux = ' Timestamp: ' + str(date)
+            res = res + resaux
+        if not toaddr and not subs:
+            print(str(res))
+        else:
+            res = res + '\n'
+        return res
 
     def host_gethistdiff(self, host, history, output, filereportpath, diff, toaddr, subs):
         """
@@ -680,8 +708,8 @@ class ShodanSeeker:
             for name, description in iter(res.items()):
                 click.echo(click.style('{0:<30}'.format(name)) + description)
         elif str(input) == "tags":
-            for mainpath in self.config.paths:
-                mainpath = self.config.paths['mainpath'] + "tags"
+            for mainpath in config.paths:
+                mainpath = config.paths['mainpath'] + "tags"
             if os.path.isfile(mainpath):
                 try:
                     with open(mainpath, "r") as file_lines:
@@ -725,7 +753,7 @@ EXAMPLES:
   ./shodanseeker --get [protocols|services|ports|tags]                       # List of (protocols,services,ports,tags) supported
         '''))
 
-        #parser.add_argument('-h', '--help', action=help)
+        # parser.add_argument('-h', '--help', action=help)
         parser.add_argument("--mail", dest="mail", help="Send email with results and alerts", default=None)
         parser.add_argument("-a", dest="attach", action="store_true", help="Attach csv results to an email",
                             default=None)
@@ -775,14 +803,14 @@ EXAMPLES:
 
         # for key in self.config.api:
         #     self.api_key = key['key']
-        # for logpath in self.config.paths:
+        # for logpath in config.paths:
         #     # TODO:
-        #     self.logpath = self.config.paths['logpath']
-
-        for key in self.config.api:
-            self.api_key = key['key']
-        for logpath in self.config.paths:
-            self.logpath = self.config.paths['logpath']
+        #     self.logpath = config.paths['logpath']
+        #
+        # for key in config.api:
+        #     self.api_key = key['key']
+        for logpath in config.paths:
+            self.logpath = config.paths['logpath']
 
         if self.api_key == '':
             print('[Error] Set the Shodan API Key into the configuration file')
@@ -818,7 +846,7 @@ EXAMPLES:
 
         elif myoption.getinfo:
             if myoption.getinfo:
-                shodangetinfo = ShodanSeeker(self.api_key)
+                shodangetinfo = ShodanSeeker(config, api_key=self.api_key)
                 if myoption.history and myoption.diff:
                     parser.error("Options --history and --diff are mutually exclusive")
                 if myoption.history:

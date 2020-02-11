@@ -14,7 +14,7 @@ class NullOutput(object):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    args = vars(parser.parse_args())
+    # parser = argparse.ArgumentParser()
+    # args = vars(parser.parse_args())
     app = ShodanSeeker(config)
     app.run()
