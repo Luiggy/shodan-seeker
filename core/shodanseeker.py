@@ -2,14 +2,11 @@ import textwrap
 import argparse
 import datetime
 import logging
-from optparse import OptionParser
 import os
 import smtplib
-import sys
 import time
 from datetime import datetime, timedelta
 from email.mime.application import MIMEApplication
-
 # migrated to py3
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -20,21 +17,21 @@ from ipcalc import Network
 from shodan import Shodan
 from shodan.exception import APIError
 from shodan.helpers import get_ip
-
 # Create a logger object para poder logar los errores que nos aparezcan esto para el bot
-import config
+
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='DEBUG')
 logging.basicConfig(filename='logs/seeker.log', filemode='w', level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+this_dir = os.path.split(os.path.abspath(os.path.join(os.path.dirname(__file__))))[0]
 fecha = datetime.now()
 filereportname = fecha.strftime("%Y-%m-%d-%H%M%S")
 
 
 class ShodanSeeker:
     def __init__(self, config, api_key=None, proxies=None):
-        self.api_key = config.api['key']
+        self.api_key = api_key if api_key else config.api['key']
         self.proxies = proxies
         self.api = Shodan(self.api_key, self.proxies)
         self.force = False
@@ -60,9 +57,9 @@ class ShodanSeeker:
         else:
             logging.info('[ Log ] ' + fecha.strftime("%c") + ' - ' + str(action) + str(data))
         filelogname = fecha.strftime("%m-%Y")
-        for logpath in config.paths:
+        if 'logpath' in self.config.paths:
             # noinspection PyAttributeOutsideInit
-            self.logpath = config.paths['logpath']
+            self.logpath = self.config.paths['logpath']
         filelogpath = str(self.logpath) + filelogname + ".log"
         if os.path.isfile(filelogpath):
             fich = open(filelogpath, "a")
@@ -76,9 +73,9 @@ class ShodanSeeker:
             logging.info(str(data))  # Console output
 
     def add_scanid(self, id):
-        for scanidpath in config.paths:
+        if 'scanidpath' in self.config.paths:
             # noinspection PyAttributeOutsideInit
-            self.scanidpath = config.paths['scanidpath'] + "scanID.txt"
+            self.scanidpath = self.config.paths['scanidpath'] + "scanID.txt"
         if os.path.isfile(self.scanidpath):
             fich = open(self.scanidpath, "a")
             fich.write(id + '\t' + fecha.strftime("%c") + '\n')
@@ -90,8 +87,8 @@ class ShodanSeeker:
             fich.close()
 
     def print_scanlistID(self):
-        for scanidpath in config.paths:
-            self.scanidpath = config.paths['scanidpath'] + "scanID.txt"
+        if 'scanidpath' in self.config.paths:
+            self.scanidpath = self.config.paths['scanidpath'] + "scanID.txt"
         if os.path.isfile(self.scanidpath):
             try:
                 with open(self.scanidpath, "r") as file_lines:
@@ -102,12 +99,11 @@ class ShodanSeeker:
                          text=line r"""
             except APIError as e:
                 logging.error("Error:", e)
-                sys.exit(1)
+
         else:
             """print('No scan has been sent yet')
             Cambiarr por el send message de telegram"""
             logging.info("[SCANLIST] No scan has been sent yet")
-            sys.exit(1)
 
     def scan_range(self, input, force):
         logging.info("Scan IP/netblock - ", input)
@@ -125,7 +121,6 @@ class ShodanSeeker:
         except APIError as e:
             logging.info("Error", e)
             logging.info("newline")
-            sys.exit(1)
 
     def scan_file(self, file, force):
         logging.info("Scan file - ", file)
@@ -148,40 +143,39 @@ class ShodanSeeker:
                 except APIError as e:
                     self.log("Error", e.value)
                     self.log("newline")
-                    sys.exit(1)
+
         except APIError as e:
             self.log("Error", e.value)
             self.log("newline")
-            sys.exit(1)
 
     def get_info(self, input, history, diff, output, toaddr, attach):
         self.log("Get info from IP/netblock - ", input)
         # self.log("History banners - ", history)
         # self.log("Diff - ", diff)
         # self.log("Format - ", output)
-        if toaddr is not None:
+        if toaddr:
             try:
                 self.log("Mail - ", self.config.mail[toaddr])
             except KeyError as e:
                 e = "Address is not found in config.py: " + toaddr
                 self.log("Error", e)
                 self.log("newline")
-                sys.exit(1)
+
         # else:
         # self.log("Mail - ", toaddr)
         res = ""
         res1 = ""
         lista = input.split(" ")
         # self.log("List Split - ", list)
-        for reportpath in config.paths:
-            self.reportpath = config.paths['reportpath']
-        if history is not None:
-            if diff is not None:
-                filereportpath = str(self.reportpath) + str('diffing/') + filereportname + ".csv"
-            else:
-                filereportpath = str(self.reportpath) + str('history/') + filereportname + ".csv"
+        if 'reportpath' in self.config.paths:
+            self.reportpath = self.config.paths['reportpath']
+        if history:
+            filereportpath = os.path.join(this_dir, self.reportpath, 'history', filereportname + 'csv')
+        elif diff:
+            # filereportpath = str(self.reportpath) + str('diffing/') + filereportname + ".csv"
+            filereportpath = os.path.join(this_dir, self.reportpath, 'diffing', filereportname + 'csv')
         else:
-            filereportpath = str(self.reportpath) + filereportname + ".csv"
+            filereportpath = os.path.join(this_dir, self.reportpath, filereportname + '.csv')
         for item in lista:
             if "/" not in item:
                 try:
@@ -232,7 +226,7 @@ class ShodanSeeker:
                 e = "Address is not found in config.py: " + toaddr
                 self.log("Error", e)
                 self.log("newline")
-                sys.exit(1)
+
         # else:
         # self.log("Mail - ", toaddr)
         res = ""  # body mail
@@ -243,8 +237,8 @@ class ShodanSeeker:
                 for line in file_lines:
                     lista.append(line.replace('\n', ''))
                 self.log("List of IPs/netblock - ", lista)
-                for reportpath in config.paths:
-                    self.reportpath = config.paths['reportpath']
+                if 'reportpath' in self.config.paths:
+                    self.reportpath = self.config.paths['reportpath']
                 if history is not None:
                     if diff is not None:
                         filereportpath = str(self.reportpath) + str('diffing/') + filereportname + ".csv"
@@ -293,24 +287,23 @@ class ShodanSeeker:
         except APIError as e:
             self.log("Error", e.value)
             self.log("newline")
-            sys.exit(1)
 
     def host_print(self, host, history, output, filereportpath, diff, toaddr):
-        self.res = ""
-        if None == output:
-            self.host_gethistdiff(host, history, None, filereportpath, diff, toaddr, None)
+        res = ""
+        if not output:
+            res = self.host_gethistdiff(host, history, None, filereportpath, diff, toaddr, None)
         else:
             if output == 'csv':
-                self.res = self.host_gethistdiff(host, history, output, filereportpath, diff, toaddr, None)
+                res = self.host_gethistdiff(host, history, output, filereportpath, diff, toaddr, None)
             else:
                 print('[Error] Output format not supported')
                 logger.error('[Error] Output format not supported')
-                sys.exit(1)
-        return self.res
+
+        return res
 
     def host_printoutput(self, port, transport, product, version, date, toaddr, subs):
         res = 'Port: ' + str(port) + ' ' + str(transport)
-        if product or version:
+        if product and version:
             res = res + ' ' + str(product) + ' ' + str(version)
         if date:
             resaux = ' Timestamp: ' + str(date)
@@ -514,7 +507,6 @@ class ShodanSeeker:
         except APIError as e:
             self.log("Error", e.value)
             self.log("newline")
-            sys.exit(1)
 
     def create_alert(self, name, ips):
         self.log("Create alert")
@@ -535,7 +527,6 @@ class ShodanSeeker:
         except APIError as e:
             self.log("Error", e.value)
             self.log("newline")
-            sys.exit(1)
 
     # TODO añadir logger
     def create_alertfile(self, name, file):
@@ -561,18 +552,16 @@ class ShodanSeeker:
                 except APIError as e:
                     self.log("Error", e.value)
                     self.log("newline")
-                    sys.exit(1)
+
         except APIError as e:
             self.log("Error", e.value)
             self.log("newline")
-            sys.exit(1)
 
     def list_alerts(self):
         try:
             results = self.api.alerts()
         except APIError as e:
             print('[Error]' + e.value)
-            sys.exit(1)
 
         if len(results) > 0:
             click.echo(click.style('{0:<30}'.format('AlertID')) + click.style(
@@ -594,7 +583,6 @@ class ShodanSeeker:
             except APIError as e:
                 self.log("Error", e.value)
                 self.log("newline")
-                sys.exit(1)
 
     def remove_allalerts(self):
         try:
@@ -608,7 +596,6 @@ class ShodanSeeker:
         except APIError as e:
             self.log("Error", e.value)
             self.log("newline")
-            sys.exit(1)
 
     def subscribe_ports(self, alertid, monport, toaddr):
         self.alertid = alertid
@@ -628,12 +615,12 @@ class ShodanSeeker:
                         port = str((banner['port']))
                         data = 'Hostname: ' + ip + ' Port: ' + port
                         self.log('Alert: ', data)
-                        if (toaddr) is not None:
+                        if toaddr is not None:
                             self.send_mail('[Alert] Risk port open', data, toaddr, None, None)
         except APIError as e:
             self.log("Error", e.value)
             self.log("newline")
-            sys.exit(1)
+
         except requests.exceptions.ChunkedEncodingError:
             self.subscribe_ports(self.alertid, self.monport, self.toaddr)
 
@@ -664,7 +651,7 @@ class ShodanSeeker:
         except APIError as e:
             self.log("Error", e.value)
             self.log("newline")
-            sys.exit(1)
+
         except requests.exceptions.ChunkedEncodingError:
             self.subscribe_diff(self.alertid, self.toaddr)
 
@@ -685,12 +672,12 @@ class ShodanSeeker:
                         ip = str(get_ip(banner))
                         data = 'Hostname: ' + ip + ' Tag: ' + str(m)
                         self.log('Alert: ', data)
-                        if (toaddr) is not None:
+                        if toaddr is not None:
                             self.send_mail('[Alert] Tag detected', data, toaddr, None, None)
         except APIError as e:
             self.log("Error", e.value)
             self.log("newline")
-            sys.exit(1)
+
         except requests.exceptions.ChunkedEncodingError:
             self.subscribe_tags(self.alertid, self.montags, self.toaddr)
 
@@ -708,23 +695,21 @@ class ShodanSeeker:
             for name, description in iter(res.items()):
                 click.echo(click.style('{0:<30}'.format(name)) + description)
         elif str(input) == "tags":
-            for mainpath in config.paths:
-                mainpath = config.paths['mainpath'] + "tags"
+            if 'mainpath' in self.config.paths:
+                mainpath = self.config.paths['mainpath'] + "tags"
             if os.path.isfile(mainpath):
                 try:
                     with open(mainpath, "r") as file_lines:
                         for line in file_lines:
-                            print
-                            line.rstrip('\n')
+                            print(line.rstrip('\n'))
                 except APIError as e:
                     self.log("Error", e.value)
-                    sys.exit(1)
+
             else:
                 print('No scan has been sent yet')
-                sys.exit(1)
+
         else:
             print("[Error] - Input must be: protocols, services or ports")
-            sys.exit(1)
 
     @property
     def run(self):
@@ -809,13 +794,12 @@ EXAMPLES:
         #
         # for key in config.api:
         #     self.api_key = key['key']
-        for logpath in config.paths:
-            self.logpath = config.paths['logpath']
+        if 'logpath' in self.config.paths:
+            self.logpath = self.config.paths['logpath']
 
-        if self.api_key == '':
+        if not self.api_key:
             print('[Error] Set the Shodan API Key into the configuration file')
             logger.error('[Error NO API] Set the Shodan API Key into the configuration file')
-            sys.exit(1)
 
         if myoption.scaninput:
             if myoption.scaninput:
@@ -825,7 +809,6 @@ EXAMPLES:
                 shodanscan.scan_range(myoption.scaninput, self.force)
             else:
                 print('[Error] Input must not be null')
-                sys.exit(1)
 
         elif myoption.scanfile:
             if myoption.scanfile:
@@ -836,17 +819,15 @@ EXAMPLES:
                     shodanscan.scan_file(myoption.scanfile, self.force)
                 else:
                     print('[Error] File does not exist')
-                    sys.exit(1)
+
             else:
                 print('[Error] Input must not be null')
-                sys.exit(1)
-
         elif myoption.scanlist:
             self.print_scanlistID()
 
         elif myoption.getinfo:
             if myoption.getinfo:
-                shodangetinfo = ShodanSeeker(config, api_key=self.api_key)
+                shodangetinfo = ShodanSeeker(self.config, api_key=self.api_key)
                 if myoption.history and myoption.diff:
                     parser.error("Options --history and --diff are mutually exclusive")
                 if myoption.history:
@@ -939,7 +920,7 @@ EXAMPLES:
                                 shodangetinfo.get_info(myoption.getinfo, None, None, None, None, None)
             else:
                 print('[Error] Input must not be null')
-                sys.exit(1)
+
 
         elif myoption.getinfofromfile:
             if myoption.getinfofromfile:
@@ -1051,10 +1032,9 @@ EXAMPLES:
                                                                            None, None)
                 else:
                     print('[Error] File does not exist')
-                    sys.exit(1)
+
             else:
                 print('[Error] Input must not be null')
-                sys.exit(1)
 
         elif myoption.addalert:
             if myoption.addalert:
@@ -1064,7 +1044,6 @@ EXAMPLES:
                 shodanaddalert.create_alert(name, ips)
             else:
                 print('[Error] Input must not be null')
-                sys.exit(1)
 
         elif myoption.addalertfile:
             if myoption.addalertfile:
@@ -1075,10 +1054,9 @@ EXAMPLES:
                     shodanaddalertfile.create_alertfile(name, file)
                 else:
                     print('[Error] File does not exist')
-                    sys.exit(1)
+
             else:
                 print('[Error] Input must not be null')
-                sys.exit(1)
 
         elif myoption.listalerts:
             shodanlistalerts = ShodanSeeker(self.api_key)
@@ -1090,7 +1068,6 @@ EXAMPLES:
                 shodanadddelalert.delete_alert(myoption.delalert)
             else:
                 print('[Error] Input must not be null')
-                sys.exit(1)
 
         elif myoption.subsalerts:
             if myoption.subsalerts:
@@ -1123,20 +1100,15 @@ EXAMPLES:
                         shodansubs.subscribe_tags(myoption.subsalerts, myoption.montag, None)
                 else:
                     print('[Error] --mon option must not be null')
-                    sys.exit(1)
             else:
                 print('[Error] Input must not be null')
-                sys.exit(1)
-
         elif myoption.get:
             if myoption.get:
                 shodanget = ShodanSeeker(self.api_key)
                 shodanget.get_services(myoption.get)
             else:
                 print('[Error] Input must not be null')
-                sys.exit(1)
 
         else:
             parser.print_help()
             print("")
-            sys.exit(1)
